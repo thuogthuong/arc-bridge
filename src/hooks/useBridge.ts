@@ -33,7 +33,7 @@ export function useBridge() {
       const adapter = await getAdapter(connectorClient)
       const result  = await appKit.estimateBridge({
         from: { adapter, chain: fromChain },
-        to:   { adapter, chain: toChain },
+        to:   { adapter, chain: toChain, useForwarder: true },
         amount,
       })
       setFees((result.fees ?? []) as FeeEstimate[])
@@ -58,15 +58,23 @@ export function useBridge() {
 
     try {
       const adapter = await getAdapter(connectorClient)
-      const params: any = {
-        from: { adapter, chain: fromChain },
-        to:   { adapter, chain: toChain },
-        amount,
+
+      // useForwarder: true → Circle tự mint bên đích, không cần native token
+      const toParams: any = {
+        adapter,
+        chain: toChain,
+        useForwarder: true,
       }
       if (recipientAddress && recipientAddress !== connectorClient.account?.address) {
-        params.to.recipientAddress = recipientAddress
+        toParams.recipientAddress = recipientAddress
       }
-      const result = await appKit.bridge(params)
+
+      const result = await appKit.bridge({
+        from:   { adapter, chain: fromChain },
+        to:     toParams,
+        amount,
+      })
+
       const parsedSteps: BridgeStep[] = ((result as any).steps ?? []).map((s: any) => ({
         name: s.name, state: s.state,
         txHash: s.txHash ?? s.data?.txHash,
