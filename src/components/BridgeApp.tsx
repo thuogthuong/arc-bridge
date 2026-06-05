@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { CryptoBg } from './CryptoBg'
 import { ALL_CHAINS, ChainId, loadHistory, TxRecord } from '../lib/config'
 import { useBridge } from '../hooks/useBridge'
 
@@ -24,7 +25,7 @@ export function BridgeApp() {
   const { disconnect }           = useDisconnect()
 
   // Theme
-  const [dark, setDark] = useState(() => localStorage.getItem('arc-bridge-theme') !== 'light')
+  const [dark, setDark] = useState(() => localStorage.getItem('arc-bridge-theme') === 'dark')
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
     localStorage.setItem('arc-bridge-theme', dark ? 'dark' : 'light')
@@ -65,12 +66,7 @@ export function BridgeApp() {
 
   return (
     <div className="app">
-      {/* Crypto background icons */}
-      <div className="crypto-bg" aria-hidden="true">
-        {['₿','Ξ','◎','⬡','▲','✦','◈','⟠','₳','Ł'].map((s, i) => (
-          <span key={i} className={`crypto-icon ci-${i}`}>{s}</span>
-        ))}
-      </div>
+      <CryptoBg />
 
       {/* Header */}
       <header className="header">

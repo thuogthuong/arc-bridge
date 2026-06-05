@@ -84,9 +84,10 @@ export function useBridge() {
       if (recipientAddress) toParams.recipientAddress = recipientAddress
 
       const result = await appKit.bridge({
-        from: { adapter, chain: fromChain },
-        to:   toParams,
+        from:   { adapter, chain: fromChain },
+        to:     toParams,
         amount,
+        config: { transferSpeed: 'FAST', maxFee: '0.50' },
       })
 
       const parsedSteps: BridgeStep[] = ((result as any).steps ?? []).map((s: any) => ({

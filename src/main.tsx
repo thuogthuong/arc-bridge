@@ -6,8 +6,8 @@ import { wagmiConfig } from './lib/config'
 import { BridgeApp } from './components/BridgeApp'
 import './index.css'
 
-// Init theme trước khi render
-const savedTheme = localStorage.getItem('arc-bridge-theme') ?? 'dark'
+// Mặc định là light mode
+const savedTheme = localStorage.getItem('arc-bridge-theme') ?? 'light'
 document.documentElement.setAttribute('data-theme', savedTheme)
 
 const queryClient = new QueryClient()
