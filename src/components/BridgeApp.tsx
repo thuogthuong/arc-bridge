@@ -3,20 +3,15 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { CryptoBg } from './CryptoBg'
 import { ALL_CHAINS, ChainId, loadHistory, TxRecord } from '../lib/config'
 import { useBridge } from '../hooks/useBridge'
+import { T, Lang } from '../lib/i18n'
 
 function shortAddr(a: string) { return `${a.slice(0,6)}...${a.slice(-4)}` }
-function timeAgo(ts: number) {
+function timeAgo(ts: number, t: typeof T['en']) {
   const d = (Date.now() - ts) / 1000
-  if (d < 60) return 'vừa xong'
-  if (d < 3600) return `${Math.floor(d/60)}p trước`
-  if (d < 86400) return `${Math.floor(d/3600)}h trước`
-  return `${Math.floor(d/86400)}d trước`
-}
-
-const STEP_LABELS: Record<string, string> = {
-  approve: '✅ Approve USDC', burn: '🔥 Burn on source',
-  fetchAttestation: '📡 Chờ attestation', mint: '🪙 Mint on Arc',
-  transfer: '📤 Transfer', send: '📤 Send tx',
+  if (d < 60) return t.timeJustNow
+  if (d < 3600) return t.timeMin(Math.floor(d/60))
+  if (d < 86400) return t.timeHour(Math.floor(d/3600))
+  return t.timeDay(Math.floor(d/86400))
 }
 
 export function BridgeApp() {
@@ -31,6 +26,11 @@ export function BridgeApp() {
     localStorage.setItem('arc-bridge-theme', dark ? 'dark' : 'light')
   }, [dark])
 
+  // Language — default EN
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('arc-bridge-lang') as Lang) || 'en')
+  useEffect(() => { localStorage.setItem('arc-bridge-lang', lang) }, [lang])
+  const t = T[lang]
+
   // State
   const [fromChain, setFromChain]   = useState<ChainId>('Base_Sepolia')
   const [toChain, setToChain]       = useState<ChainId>('Arc_Testnet')
@@ -42,10 +42,8 @@ export function BridgeApp() {
 
   const { status, fees, steps, error, estimate, bridge, reset } = useBridge()
 
-  // Load history
   useEffect(() => { setHistory(loadHistory()) }, [activeTab])
 
-  // Swap chains
   function swapChains() {
     const tmp = fromChain
     setFromChain(toChain)
@@ -59,10 +57,16 @@ export function BridgeApp() {
     setHistory(loadHistory())
   }
 
-  const fromInfo = ALL_CHAINS.find(c => c.id === fromChain)!
-  const toInfo   = ALL_CHAINS.find(c => c.id === toChain)!
-  const totalFee = fees.reduce((s, f) => s + parseFloat(f.amount || '0'), 0)
+  const fromInfo   = ALL_CHAINS.find(c => c.id === fromChain)!
+  const toInfo     = ALL_CHAINS.find(c => c.id === toChain)!
+  const totalFee   = fees.reduce((s, f) => s + parseFloat(f.amount || '0'), 0)
   const willReceive = Math.max(0, parseFloat(amount || '0') - totalFee)
+
+  const STEP_LABELS: Record<string, string> = {
+    approve: t.stepApprove, burn: t.stepBurn,
+    fetchAttestation: t.stepAttestation, mint: t.stepMint,
+    transfer: t.stepTransfer, send: t.stepSend,
+  }
 
   return (
     <div className="app">
@@ -73,20 +77,29 @@ export function BridgeApp() {
         <div className="logo">
           <span className="logo-icon">⬡</span>
           <span className="logo-name">Arc Bridge</span>
-          <span className="logo-sub">USDC · CCTP</span>
+          <span className="logo-sub">{t.tagline}</span>
         </div>
         <div className="header-right">
+          {/* Language toggle */}
+          <button
+            className="theme-toggle"
+            onClick={() => setLang(lang === 'en' ? 'vi' : 'en')}
+            title="Switch language"
+            style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '.05em' }}
+          >
+            {lang === 'en' ? '🇻🇳 VI' : '🇺🇸 EN'}
+          </button>
           {/* Theme toggle */}
           <button className="theme-toggle" onClick={() => setDark(!dark)} title="Toggle theme">
             {dark ? '☀️' : '🌙'}
           </button>
-          {isConnected ? (
+          {isConnected && (
             <div className="wallet-row">
               <span className="chain-pill">Arc Testnet</span>
               <span className="wallet-addr">{shortAddr(address!)}</span>
               <button className="btn-sm" onClick={() => disconnect()}>disconnect</button>
             </div>
-          ) : null}
+          )}
         </div>
       </header>
 
@@ -96,27 +109,25 @@ export function BridgeApp() {
           {/* Tabs */}
           <div className="tabs">
             <button className={`tab ${activeTab === 'bridge' ? 'active' : ''}`}
-              onClick={() => setActiveTab('bridge')}>🌉 Bridge</button>
+              onClick={() => setActiveTab('bridge')}>{t.tabBridge}</button>
             <button className={`tab ${activeTab === 'history' ? 'active' : ''}`}
               onClick={() => { setActiveTab('history'); setHistory(loadHistory()) }}>
-              📜 Lịch sử {history.length > 0 && <span className="badge">{history.length}</span>}
+              {t.tabHistory} {history.length > 0 && <span className="badge">{history.length}</span>}
             </button>
           </div>
 
           {/* ── BRIDGE TAB ── */}
           {activeTab === 'bridge' && (<>
             <div className="card-title">
-              <h1>Bridge USDC</h1>
-              <p>Chuyển USDC giữa Arc và các chain khác qua Circle CCTP</p>
+              <h1>{t.title}</h1>
+              <p>{t.subtitle}</p>
             </div>
 
             {/* Chain selector */}
             <div className="chain-row">
-              {/* FROM */}
               <div className="chain-picker">
-                <label className="field-label">Từ</label>
-                <select className="chain-select"
-                  value={fromChain}
+                <label className="field-label">{t.labelFrom}</label>
+                <select className="chain-select" value={fromChain}
                   onChange={e => { setFromChain(e.target.value as ChainId); reset() }}
                   style={{ borderColor: fromInfo.color }}>
                   {ALL_CHAINS.filter(c => c.id !== toChain).map(c => (
@@ -124,15 +135,10 @@ export function BridgeApp() {
                   ))}
                 </select>
               </div>
-
-              {/* Swap button */}
-              <button className="swap-btn" onClick={swapChains} title="Đổi chiều">⇄</button>
-
-              {/* TO */}
+              <button className="swap-btn" onClick={swapChains} title={t.swapTitle}>⇄</button>
               <div className="chain-picker">
-                <label className="field-label">Đến</label>
-                <select className="chain-select"
-                  value={toChain}
+                <label className="field-label">{t.labelTo}</label>
+                <select className="chain-select" value={toChain}
                   onChange={e => { setToChain(e.target.value as ChainId); reset() }}
                   style={{ borderColor: toInfo.color }}>
                   {ALL_CHAINS.filter(c => c.id !== fromChain).map(c => (
@@ -144,7 +150,7 @@ export function BridgeApp() {
 
             {/* Amount */}
             <div className="field-group">
-              <label className="field-label">Số lượng USDC</label>
+              <label className="field-label">{t.labelAmount}</label>
               <div className="amount-wrap">
                 <input className="amount-input" type="number" min="0.01" step="0.01"
                   value={amount} placeholder="0.00"
@@ -162,10 +168,10 @@ export function BridgeApp() {
             <div className="field-group">
               <label className="toggle-label">
                 <input type="checkbox" checked={useCustom} onChange={e => setUseCustom(e.target.checked)} />
-                Gửi đến địa chỉ khác
+                {t.labelCustom}
               </label>
               {useCustom && (
-                <input className="text-input" placeholder="0x... địa chỉ nhận"
+                <input className="text-input" placeholder={t.placeholderRecipient}
                   value={recipient} onChange={e => setRecipient(e.target.value)} />
               )}
             </div>
@@ -173,18 +179,18 @@ export function BridgeApp() {
             {/* Fee box */}
             {fees.length > 0 && (
               <div className="fee-box">
-                <div className="fee-title">💰 Ước tính phí</div>
+                <div className="fee-title">{t.feeTitle}</div>
                 {fees.map((f, i) => (
                   <div key={i} className="fee-row">
-                    <span>{f.type === 'provider' ? 'CCTP fee' : f.type === 'gas' ? 'Gas fee' : f.type}</span>
+                    <span>{f.type === 'provider' ? t.feeCCTP : f.type === 'gas' ? t.feeGas : f.type}</span>
                     <span>{f.amount} {f.currency || 'USDC'}</span>
                   </div>
                 ))}
                 <div className="fee-row fee-total">
-                  <span>Tổng phí</span><span>~{totalFee.toFixed(4)} USDC</span>
+                  <span>{t.feeTotal}</span><span>~{totalFee.toFixed(4)} USDC</span>
                 </div>
                 <div className="fee-row fee-receive">
-                  <span>Bạn nhận được</span><span>~{willReceive.toFixed(4)} USDC</span>
+                  <span>{t.feeReceive}</span><span>~{willReceive.toFixed(4)} USDC</span>
                 </div>
               </div>
             )}
@@ -195,7 +201,7 @@ export function BridgeApp() {
             {/* Steps */}
             {steps.length > 0 && (
               <div className="steps-box">
-                <div className="steps-title">Tiến trình</div>
+                <div className="steps-title">{t.stepsTitle}</div>
                 {steps.map((s, i) => (
                   <div key={i} className={`step step-${s.state}`}>
                     <span>{s.state === 'success' ? '✅' : s.state === 'error' ? '❌' : '⏳'}</span>
@@ -208,51 +214,51 @@ export function BridgeApp() {
               </div>
             )}
 
-            {/* Action */}
+            {/* Action buttons */}
             {!isConnected ? (
               <div className="connect-list">
                 {connectors.map(c => (
                   <button key={c.id} className="btn-primary" onClick={() => connect({ connector: c })}>
-                    Connect {c.name}
+                    {t.btnConnect} {c.name}
                   </button>
                 ))}
               </div>
             ) : status === 'idle' || status === 'error' ? (
               <button className="btn-primary" onClick={handleEstimate}
                 disabled={!amount || parseFloat(amount) <= 0}>
-                🔍 Xem phí ước tính
+                {t.btnEstimate}
               </button>
             ) : status === 'estimating' ? (
-              <button className="btn-primary loading" disabled>⏳ Đang tính phí...</button>
+              <button className="btn-primary loading" disabled>{t.btnEstimating}</button>
             ) : status === 'ready' ? (
               <div className="action-row">
-                <button className="btn-secondary" onClick={reset}>← Đổi</button>
+                <button className="btn-secondary" onClick={reset}>{t.btnBack}</button>
                 <button className="btn-primary" onClick={handleBridge}>
-                  🌉 Bridge {amount} USDC
+                  {t.btnBridge} {amount} USDC
                 </button>
               </div>
             ) : status === 'bridging' ? (
-              <button className="btn-primary loading" disabled>⏳ Đang bridge...</button>
+              <button className="btn-primary loading" disabled>{t.btnBridging}</button>
             ) : status === 'done' ? (
               <div className="done-box">
                 <div className="done-icon">🎉</div>
-                <div className="done-text">Bridge thành công!</div>
-                <div className="done-sub">{amount} USDC → {toInfo.name}</div>
-                <button className="btn-secondary" onClick={reset}>Bridge thêm</button>
+                <div className="done-text">{t.doneTitle}</div>
+                <div className="done-sub">{t.doneSub(amount, toInfo.name)}</div>
+                <button className="btn-secondary" onClick={reset}>{t.btnBridgeMore}</button>
               </div>
             ) : null}
 
-            {/* Info */}
+            {/* Info grid */}
             <div className="info-grid">
-              <div className="info-item"><span>⚡ Tốc độ</span><span>~20 giây</span></div>
+              <div className="info-item"><span>⚡ Speed</span><span>{t.infoSpeed}</span></div>
               <div className="info-item"><span>🔐 Protocol</span><span>Circle CCTP v2</span></div>
               <div className="info-item">
                 <span>🪙 Faucet</span>
-                <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer">faucet.circle.com ↗</a>
+                <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer">{t.infoFaucet} ↗</a>
               </div>
               <div className="info-item">
                 <span>🔍 Explorer</span>
-                <a href="https://testnet.arcscan.app" target="_blank" rel="noopener noreferrer">arcscan.app ↗</a>
+                <a href="https://testnet.arcscan.app" target="_blank" rel="noopener noreferrer">{t.infoExplorer} ↗</a>
               </div>
             </div>
           </>)}
@@ -260,9 +266,9 @@ export function BridgeApp() {
           {/* ── HISTORY TAB ── */}
           {activeTab === 'history' && (
             <div className="history-tab">
-              <h2 className="history-title">📜 Lịch sử giao dịch</h2>
+              <h2 className="history-title">{t.historyTitle}</h2>
               {history.length === 0 ? (
-                <div className="history-empty">Chưa có giao dịch nào</div>
+                <div className="history-empty">{t.historyEmpty}</div>
               ) : (
                 <div className="history-list">
                   {history.map(tx => {
@@ -283,10 +289,10 @@ export function BridgeApp() {
                         </div>
                         <div className="hi-bottom">
                           <span className="hi-amount">{tx.amount} USDC</span>
-                          <span className="hi-time">{timeAgo(tx.timestamp)}</span>
+                          <span className="hi-time">{timeAgo(tx.timestamp, t)}</span>
                           {tx.explorerUrl && (
                             <a href={tx.explorerUrl} target="_blank" rel="noopener noreferrer" className="hi-link">
-                              Xem tx ↗
+                              {t.historyView}
                             </a>
                           )}
                         </div>
@@ -297,7 +303,7 @@ export function BridgeApp() {
               )}
               <button className="btn-secondary" style={{ marginTop: '1rem' }}
                 onClick={() => { localStorage.removeItem('arc-bridge-history'); setHistory([]) }}>
-                🗑 Xóa lịch sử
+                {t.historyClear}
               </button>
             </div>
           )}
